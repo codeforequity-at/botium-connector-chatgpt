@@ -113,8 +113,6 @@ describe('connector', function () {
       ]
     })
     const botMsg = await this._nextBotMsg()
-    debug(`Bot response: ${botMsg.messageText}`)
-    debug(`Bot response: ${botMsg?.messageText.toLowerCase()}`)
     assert.equal(botMsg?.messageText?.toLowerCase(), 'botium')
   }).timeout(10000)
 

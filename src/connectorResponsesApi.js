@@ -59,7 +59,7 @@ class BotiumConnectorChatGPTResponsesAPI {
         userContent.push({ type: 'input_text', text: msg.messageText })
       }
 
-      for (const [idx, a] of (msg.media || []) .entries()) {
+      for (const a of (msg.media || [])) {
         const name = a.mediaUri || a?.altText
         const buffer = a?.buffer ? (Buffer.isBuffer(a.buffer) ? a.buffer : Buffer.from(a.buffer)) : null
         const mimeType = a?.mimeType
@@ -75,14 +75,14 @@ class BotiumConnectorChatGPTResponsesAPI {
 
         if (isImage) {
           if (this.fileSendMode === 'base64') {
-            debug(`Sending image as base64`)
+            debug('Sending image as base64')
             const imageUrl = `data:${mimeType};base64,${buffer.toString('base64')}`
             userContent.push({
               type: 'input_image',
               image_url: imageUrl
             })
           } else {
-            debug(`Uploading image to OpenAI`)
+            debug('Uploading image to OpenAI')
             let uploaded = null
             try {
               const fileForUpload = await toFile(buffer, name, { type: mimeType || 'application/octet-stream' })
@@ -107,7 +107,7 @@ class BotiumConnectorChatGPTResponsesAPI {
             }
           }
         } else if (isText) {
-          debug(`Sending text inline`)
+          debug('Sending text inline')
           const textContent = buffer.toString('utf8')
           userContent.push({
             type: 'input_text',
