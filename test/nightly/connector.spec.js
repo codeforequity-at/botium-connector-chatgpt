@@ -3,8 +3,13 @@ const assert = require('chai').assert
 const Connector = require('../../src/connectorResponsesApi')
 const debug = require('debug')('botium-connector-chatgpt-test')
 const _ = require('lodash')
+const fs = require('fs')
+const path = require('path')
 
 const { readCaps } = require('./helper')
+
+const BOTIUM_PNG_BASE64 = fs.readFileSync(path.join(__dirname, 'botium.png'))
+const BOTIUM_TXT_BASE64 = fs.readFileSync(path.join(__dirname, 'botium.txt'))
 
 describe('connector', function () {
   beforeEach(async function () {
@@ -63,6 +68,53 @@ describe('connector', function () {
     assert.isTrue(botMsg?.messageText && botMsg.messageText.length > 0, 'Expected bot response')
     debug(`Bot response: ${botMsg.messageText}`)
   }).timeout(30000)
+
+  it('should accept base64 attachment and respond', async function () {
+    await this.connector.UserSays({
+      messageText: 'Return just the text of the image.',
+      media: [
+        {
+          name: 'botium.png',
+          mimeType: 'image/png',
+          buffer: BOTIUM_PNG_BASE64
+        }
+      ]
+    })
+    const botMsg = await this._nextBotMsg()
+    assert.equal(botMsg?.messageText?.toLowerCase(), 'botium')
+  }).timeout(60000)
+
+  it('should accept uploaded attachment and respond', async function () {
+    await this.init({ CHATGPT_FILE_SEND_MODE: 'upload' })
+
+    await this.connector.UserSays({
+      messageText: 'Return just the text of the image.',
+      media: [
+        {
+          name: 'botium.png',
+          mimeType: 'image/png',
+          buffer: BOTIUM_PNG_BASE64
+        }
+      ]
+    })
+    const botMsg = await this._nextBotMsg()
+    assert.equal(botMsg?.messageText?.toLowerCase(), 'botium')
+  }).timeout(60000)
+
+  it('should inline text attachment content', async function () {
+    await this.connector.UserSays({
+      messageText: 'Just return the text of the attached file',
+      media: [
+        {
+          name: 'botium.txt',
+          mimeType: 'text/plain',
+          buffer: BOTIUM_TXT_BASE64
+        }
+      ]
+    })
+    const botMsg = await this._nextBotMsg()
+    assert.equal(botMsg?.messageText?.toLowerCase(), 'botium')
+  }).timeout(10000)
 
   afterEach(async function () {
     debug('afterEach called, stopping connector')

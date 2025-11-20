@@ -1,6 +1,6 @@
 {
   "name": "botium-connector-chatgpt",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Botium Connector for ChatGPT",
   "main": "dist/botium-connector-chatgpt-cjs.js",
   "module": "dist/botium-connector-chatgpt-es.js",
