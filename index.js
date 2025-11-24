@@ -33,7 +33,7 @@ module.exports = {
       {
         name: 'CHATGPT_PROMPT',
         label: 'System Prompt',
-        type: 'string',
+        type: 'text',
         required: false,
         description: 'Optional system prompt to initialize the assistant.'
       },
