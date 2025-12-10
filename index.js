@@ -48,6 +48,14 @@ module.exports = {
           { name: 'Base64 (image only)', key: 'base64' },
           { name: 'Upload (all file types)', key: 'upload' }
         ]
+      },
+      {
+        name: 'CHATGPT_RESPOND_AS_BOTIUM_JSON',
+        label: 'Respond as Botium JSON',
+        type: 'boolean',
+        required: false,
+        advanced: true,
+        description: 'If enabled, requests a Botium-style JSON (messageText, buttons, media, cards, intent) using OpenAI JSON Schema. Mandatory for Excel file creation.'
       }
     ]
   }
