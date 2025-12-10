@@ -18,7 +18,6 @@ describe('connector', function () {
       caps = Object.assign({}, readCaps(), caps)
       this.botMsgs = []
       const queueBotSays = (botMsg) => {
-        debug(`Incoming message from bot: ${JSON.stringify(botMsg)}`)
         if (this.botMsgPromiseResolve) {
           if (!_.isError(botMsg)) {
             this.botMsgPromiseResolve(botMsg)
@@ -67,7 +66,7 @@ describe('connector', function () {
     const botMsg = await this._nextBotMsg()
     assert.isTrue(botMsg?.messageText && botMsg.messageText.length > 0, 'Expected bot response')
     debug(`Bot response: ${botMsg.messageText}`)
-  }).timeout(30000)
+  }).timeout(300000)
 
   it('should accept base64 attachment and respond', async function () {
     await this.connector.UserSays({
@@ -115,6 +114,53 @@ describe('connector', function () {
     const botMsg = await this._nextBotMsg()
     assert.equal(botMsg?.messageText?.toLowerCase(), 'botium')
   }).timeout(10000)
+
+  it('should support Botium JSON response format and map messageText', async function () {
+    await this.init({ CHATGPT_RESPOND_AS_BOTIUM_JSON: true })
+    await this.connector.UserSays({
+      messageText: 'Reply as Botium JSON. Set messageText exactly to "botium".'
+    })
+    const botMsg = await this._nextBotMsg()
+    assert.equal(botMsg?.messageText?.toLowerCase(), 'botium')
+  }).timeout(30000)
+
+  it('should support Botium JSON response format with buttons', async function () {
+    await this.init({ CHATGPT_RESPOND_AS_BOTIUM_JSON: true })
+    await this.connector.UserSays({
+      messageText: 'Reply as Botium JSON with messageText "test" and include at least one button with text "Click me" and payload "button1".'
+    })
+    const botMsg = await this._nextBotMsg()
+    assert.isTrue(botMsg?.messageText && botMsg.messageText.length > 0, 'Expected messageText')
+    assert.isTrue(Array.isArray(botMsg?.buttons), 'Expected buttons array')
+    assert.isTrue(botMsg.buttons.length > 0, 'Expected at least one button')
+    assert.isTrue(botMsg.buttons.some(b => b.text && b.text.toLowerCase().includes('click')), 'Expected button with "click" text')
+  }).timeout(300000)
+
+  it('should support Botium JSON response format when asking about Excel creation', async function () {
+    await this.init({ CHATGPT_RESPOND_AS_BOTIUM_JSON: true })
+    await this.connector.UserSays({
+      messageText: 'Are you able to create me a multiplication table for the numbers 1 to 10 in excel format?'
+    })
+    const botMsg = await this._nextBotMsg()
+    assert.isTrue(botMsg?.messageText && botMsg.messageText.length > 0, 'Expected messageText')
+    assert.isTrue(Array.isArray(botMsg?.media), 'Expected media array')
+    assert.isTrue(botMsg.media.length === 1, 'Expected one media item')
+    // Check for Excel-related content in the response
+    const hasExcelContent = botMsg.messageText.toLowerCase().includes('excel')
+    assert.isTrue(hasExcelContent, 'Expected Excel-related content in response text')
+  }).timeout(200000)
+
+  it('should support Botium JSON response format with cards', async function () {
+    await this.init({ CHATGPT_RESPOND_AS_BOTIUM_JSON: true })
+    await this.connector.UserSays({
+      messageText: 'Reply as Botium JSON with messageText "test" and include at least one card with title "Test Card" and subtitle "Test Subtitle".'
+    })
+    const botMsg = await this._nextBotMsg()
+    assert.isTrue(botMsg?.messageText && botMsg.messageText.length > 0, 'Expected messageText')
+    assert.isTrue(Array.isArray(botMsg?.cards), 'Expected cards array')
+    assert.isTrue(botMsg.cards.length > 0, 'Expected at least one card')
+    assert.isTrue(botMsg.cards.some(c => c.title && c.title.toLowerCase().includes('test')), 'Expected card with "test" in title')
+  }).timeout(30000)
 
   afterEach(async function () {
     debug('afterEach called, stopping connector')

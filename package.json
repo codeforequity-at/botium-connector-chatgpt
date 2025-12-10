@@ -1,6 +1,6 @@
 {
   "name": "botium-connector-chatgpt",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Botium Connector for ChatGPT",
   "main": "dist/botium-connector-chatgpt-cjs.js",
   "module": "dist/botium-connector-chatgpt-es.js",
@@ -48,6 +48,7 @@
     "dotenv": "^16.0.3",
     "lodash": "^4.17.21",
     "openai": "5.20.0",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "xlsx": "^0.18.5"
   }
 }
