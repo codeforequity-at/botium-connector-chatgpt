@@ -11,7 +11,7 @@ const BOTIUM_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   // For strict schemas, OpenAI requires all properties to be listed in "required"
-  required: ['messageText', 'buttons', 'media', 'cards', 'intent'],
+  required: ['messageText', 'buttons', 'media', 'attachments', 'cards', 'intent'],
   properties: {
     messageText: { type: 'string' },
     buttons: {
@@ -39,6 +39,19 @@ const BOTIUM_JSON_SCHEMA = {
           altText: { type: ['string', 'null'] }
         }
       }
+    },
+    attachments: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['name', 'mimeType', 'base64'],
+        properties: {
+          name: { type: 'string' },
+          mimeType: { type: 'string' },
+          base64: { type: 'string' }
+        }  
+      },
     },
     cards: {
       type: 'array',
@@ -74,17 +87,20 @@ const RequiredCapabilities = [
   Capabilities.CHATGPT_MODEL
 ]
 
+/**
+ * attachments response is now swiped out, but it could be merged in the future
+ */
 const BOTIUM_JSON_INSTRUCTIONS = `
 Read the text provided by the user and return it.
 
-You may use buttons, media attachments, and cards only when appropriate for the response.
+You may use buttons, media, attachments, and cards only when appropriate for the response.
 
 When returning a Base64 file (for example an Excel file), you must not create a button for it.
 
 Instead:
 
-Return the Base64 file strictly as a media attachment using
-media: { buffer: "<BASE64_STRING>", mime_type: "<MIME_TYPE>" }
+Return the Base64 file strictly as a attachment using
+attachment: { name: "<NAME>", buffer: "<BASE64_STRING>", mime_type: "<MIME_TYPE>" }
 
 Do not wrap Base64 links in a button, link, or clickable element of any kind.
 
@@ -448,8 +464,8 @@ class BotiumConnectorChatGPTResponsesAPI {
    * @returns {Object} Object containing excelMedia array and optional followUpResponse
    */
   async extractExcelFilesFromResponse (response) {
-    const excelMedia = []
     let followUpResponse = null
+    let excelAttachments = []
 
     try {
       // Check for function calls in response.output
@@ -472,14 +488,19 @@ class BotiumConnectorChatGPTResponsesAPI {
                   : item.arguments
 
                 const excelBase64 = this.createExcelFile(args.data)
-
+                excelAttachments.push({
+                  name: 'excel.xlsx',
+                  mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                  base64: excelBase64
+                })
                 // Provide function call results to the model
                 functionCallOutputs.push({
                   type: 'function_call_output',
                   call_id: item.call_id,
-                  output: JSON.stringify({
-                    file_base64: excelBase64
-                  })
+                  output: ''
+                  // output: JSON.stringify({
+                  //   file_base64: excelBase64
+                  // })
                 })
               } catch (error) {
                 debug('[Excel] Error executing createExcelFile:', error?.message || error)
@@ -504,31 +525,6 @@ class BotiumConnectorChatGPTResponsesAPI {
             debug('[Excel] Error in follow-up API call:', error?.message || error)
             throw error
           }
-          // Extract Excel files from the follow-up response
-          if (Array.isArray(followUpResponse.output)) {
-            for (const outputItem of followUpResponse.output) {
-              if (outputItem && Array.isArray(outputItem.content)) {
-                for (const content of outputItem.content) {
-                  if (content.file_base64) {
-                    try {
-                      const buffer = Buffer.from(content.file_base64, 'base64')
-                      excelMedia.push({
-                        mediaUri: content.file_base64,
-                        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                        altText: 'excel_file.xlsx',
-                        buffer: buffer
-                      })
-                      debug('[Excel] Added Excel file to excelMedia array, total count:', excelMedia.length)
-                    } catch (error) {
-                      debug('[Excel] Error processing base64 Excel file:', error?.message || error)
-                    }
-                  }
-                }
-              }
-            }
-          }
-
-          // Check for file_ids in include outputs
         } else {
           debug('[Excel] No function call outputs, skipping follow-up API call')
         }
@@ -537,8 +533,8 @@ class BotiumConnectorChatGPTResponsesAPI {
       debug('[Excel] Error extracting Excel files from response:', error?.message || error)
     }
 
-    debug('[Excel] extractExcelFilesFromResponse completed, excelMedia count:', excelMedia.length)
-    return { excelMedia, followUpResponse }
+    debug('[Excel] extractExcelFilesFromResponse completed')
+    return { followUpResponse, excelAttachments }
   }
 
   async Start () {
@@ -547,6 +543,7 @@ class BotiumConnectorChatGPTResponsesAPI {
   }
 
   async UserSays (msg) {
+    debug(`UserSays called with message: ${JSON.stringify(maskBase64InObject(msg))}`)
     const uploadedFileIds = []
     const buildUserContent = async () => {
       const content = []
@@ -625,11 +622,11 @@ class BotiumConnectorChatGPTResponsesAPI {
     const currentUserContent = await buildUserContent()
 
     try {
+      debug(`Calling OpenAI with currentUserContent: ${JSON.stringify(maskBase64InObject(currentUserContent))}`)
       const response = await this.callOpenAi(currentUserContent)
-
       // Extract Excel files from response
-      const { followUpResponse } = await this.extractExcelFilesFromResponse(response)
-
+      const { followUpResponse, excelAttachments } = await this.extractExcelFilesFromResponse(response)
+      debug(`FollowUpResponse: ${JSON.stringify(maskBase64InObject(followUpResponse))}`)
       const responseToUse = followUpResponse || response
 
       let assistantText = ''
@@ -639,21 +636,26 @@ class BotiumConnectorChatGPTResponsesAPI {
         const outputText = responseToUse.output_text
 
         // If we're expecting Botium JSON, try to parse output_text as JSON first
-        if (this.respondAsBotiumJson && outputText.trim().startsWith('{')) {
+        if (this.respondAsBotiumJson) {
+          debug(`Parsing Openai Response as Botium JSON`)
           try {
             const parsed = JSON.parse(outputText)
             if (parsed && typeof parsed === 'object') {
+              debug(`Parsed Openai Response as Botium JSON succesfully`)
               botiumJson = parsed
               assistantText = parsed.messageText || outputText
             } else {
+              debug(`Parsed Openai Response as Botium JSON failed, fallback to assistantText`)
               assistantText = outputText
             }
           } catch (e) {
+            debug(`Parsed Openai Response as Botium JSON failed with error: ${e?.message || e}, fallback to assistantText`)
             // Not JSON or parse failed, use as-is
             assistantText = outputText
           }
         } else {
           assistantText = outputText
+          debug(`Botium format disabled, assistant text extracted: ${assistantText}`)
         }
       } else {
         debug('No output_text found in response')
@@ -668,13 +670,17 @@ class BotiumConnectorChatGPTResponsesAPI {
           botMsg.messageText = botiumJson.messageText
           if (Array.isArray(botiumJson.buttons)) botMsg.buttons = botiumJson.buttons
           if (Array.isArray(botiumJson.media)) botMsg.media = botiumJson.media
+          if (Array.isArray(botiumJson.attachments)) botMsg.attachments = botiumJson.attachments
           if (Array.isArray(botiumJson.cards)) botMsg.cards = botiumJson.cards
           if (!_.isNil(botiumJson.intent)) botMsg.intent = botiumJson.intent
         } else if (assistantText) {
           botMsg.messageText = assistantText
         }
+        // it has no sense to get attachments from the response? It just makes the prompt longer, and
+        // openai might change the base64 string?
+        if (Array.isArray(excelAttachments)) botMsg.attachments = excelAttachments
 
-        this.queueBotSays(botMsg)
+        setTimeout(() => this.queueBotSays(botMsg), 0)
       } else {
         debug('[Debug] Not queuing message - no content found')
       }

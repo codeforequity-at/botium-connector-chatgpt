@@ -137,17 +137,19 @@ describe('connector', function () {
   }).timeout(300000)
 
   it('should support Botium JSON response format when asking about Excel creation', async function () {
-    await this.init({ CHATGPT_RESPOND_AS_BOTIUM_JSON: true })
+    await this.init({ CHATGPT_RESPOND_AS_BOTIUM_JSON: true, CHATGPT_PROMPT:'' })
     await this.connector.UserSays({
       messageText: 'Are you able to create me a multiplication table for the numbers 1 to 10 in excel format?'
     })
     const botMsg = await this._nextBotMsg()
     assert.isTrue(botMsg?.messageText && botMsg.messageText.length > 0, 'Expected messageText')
-    assert.isTrue(Array.isArray(botMsg?.media), 'Expected media array')
-    assert.isTrue(botMsg.media.length === 1, 'Expected one media item')
+    assert.isTrue(Array.isArray(botMsg?.attachments), 'Expected attachments array')
+    assert.isTrue(botMsg.attachments.length === 1, 'Expected one attachment')
     // Check for Excel-related content in the response
     const hasExcelContent = botMsg.messageText.toLowerCase().includes('excel')
     assert.isTrue(hasExcelContent, 'Expected Excel-related content in response text')
+    assert.isTrue(!botMsg.buttons || botMsg.buttons.length === 0, 'Expected at least one button')
+
   }).timeout(200000)
 
   it('should support Botium JSON response format with cards', async function () {
