@@ -50,8 +50,8 @@ const BOTIUM_JSON_SCHEMA = {
           name: { type: 'string' },
           mimeType: { type: 'string' },
           base64: { type: 'string' }
-        }  
-      },
+        }
+      }
     },
     cards: {
       type: 'array',
@@ -465,7 +465,7 @@ class BotiumConnectorChatGPTResponsesAPI {
    */
   async extractExcelFilesFromResponse (response) {
     let followUpResponse = null
-    let excelAttachments = []
+    const excelAttachments = []
 
     try {
       // Check for function calls in response.output
@@ -637,15 +637,15 @@ class BotiumConnectorChatGPTResponsesAPI {
 
         // If we're expecting Botium JSON, try to parse output_text as JSON first
         if (this.respondAsBotiumJson) {
-          debug(`Parsing Openai Response as Botium JSON`)
+          debug('Parsing Openai Response as Botium JSON')
           try {
             const parsed = JSON.parse(outputText)
             if (parsed && typeof parsed === 'object') {
-              debug(`Parsed Openai Response as Botium JSON succesfully`)
+              debug('Parsed Openai Response as Botium JSON succesfully')
               botiumJson = parsed
               assistantText = parsed.messageText || outputText
             } else {
-              debug(`Parsed Openai Response as Botium JSON failed, fallback to assistantText`)
+              debug('Parsed Openai Response as Botium JSON failed, fallback to assistantText')
               assistantText = outputText
             }
           } catch (e) {
